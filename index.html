@@ -6,6 +6,8 @@
     <title>Expediente Clínico - Joya Medical Services Playa del Carmen</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- HTML2PDF para generación de PDF exacto de 2 hojas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- Google Fonts Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
@@ -20,489 +22,777 @@
             height: 100%;
             cursor: crosshair;
         }
+        
+        /* Estilos estrictos para las páginas del PDF generado en segundo plano */
+        .pdf-page {
+            width: 215.9mm; /* Carta / Letter Ancho */
+            height: 279.4mm; /* Carta / Letter Alto */
+            padding: 12mm 15mm;
+            box-sizing: border-box;
+            background-color: white;
+            color: #000;
+            overflow: hidden; /* Evita cualquier derrame a una 3ra página */
+            position: relative;
+        }
+        
+        /* Ocultar elementos de impresión del layout normal */
+        #printTemplate {
+            display: none;
+        }
+
+        /* Mantener estilos de impresion web nativa por si el usuario usa Ctrl+P */
         @media print {
-            .no-print {
-                display: none !important;
-            }
-            body {
-                background-color: white !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            .unified-sheet {
-                box-shadow: none !important;
-                margin: 0 !important;
-                padding: 10mm 12mm !important;
-                border: none !important;
-                width: 100% !important;
-                max-width: none !important;
-            }
-            input, textarea, select {
-                border-color: #94a3b8 !important;
-                background-color: transparent !important;
-                color: #0f172a !important;
-            }
-            /* Force page break before section 2 if desired or let it flow nicely */
-            .page-break-before {
-                page-break-before: always;
-                break-before: page;
-                margin-top: 0 !important;
-                padding-top: 15mm !important;
-            }
+            .no-print { display: none !important; }
+            body { background-color: white !important; margin: 0 !important; padding: 0 !important; }
+            .main-app { display: none !important; }
+            #printTemplate { display: block !important; }
         }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 pb-20">
 
-    <header class="bg-cyan-950 text-white shadow-xl sticky top-0 z-50 no-print border-b border-cyan-900">
-        <div class="max-w-4xl mx-auto px-4 py-3.5 flex flex-wrap justify-between items-center gap-4">
-            <div class="flex items-center space-x-3">
-                <div class="bg-white text-cyan-950 font-black px-3.5 py-1.5 rounded-xl text-lg tracking-wider shadow-md">JOYA</div>
-                <div>
-                    <h1 class="font-extrabold text-xs md:text-sm tracking-wide">MEDICAL SERVICES - PLAYA DEL CARMEN</h1>
-                    <p class="text-[10px] text-cyan-200 font-medium">Expediente Clínico Digital Tablet (Páginas 1 & 2 Unificadas)</p>
+    <!-- Se añade un wrapper main-app para ocultarlo al imprimir si se usa Ctrl+P nativo -->
+    <div class="main-app">
+        <header class="bg-cyan-950 text-white shadow-xl sticky top-0 z-50 no-print border-b border-cyan-900">
+            <div class="max-w-4xl mx-auto px-4 py-3.5 flex flex-wrap justify-between items-center gap-4">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-white text-cyan-950 font-black px-3.5 py-1.5 rounded-xl text-lg tracking-wider shadow-md">JOYA</div>
+                    <div>
+                        <h1 class="font-extrabold text-xs md:text-sm tracking-wide">MEDICAL SERVICES - PLAYA DEL CARMEN</h1>
+                        <p class="text-[10px] text-cyan-200 font-medium">Expediente Clínico Digital Tablet (Páginas 1 & 2 Unificadas)</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <div class="bg-cyan-900 px-3.5 py-1.5 rounded-xl text-xs border border-cyan-800 shadow-inner">
+                        <span class="text-[10px] text-cyan-300 block font-semibold">FOLIO CLÍNICO:</span>
+                        <span id="folioDisplay" class="font-mono font-black text-yellow-300 text-sm">JY-2026-1043</span>
+                    </div>
                 </div>
             </div>
-            
-            <div class="flex items-center space-x-3">
-                <div class="bg-cyan-900 px-3.5 py-1.5 rounded-xl text-xs border border-cyan-800 shadow-inner">
-                    <span class="text-[10px] text-cyan-300 block font-semibold">FOLIO CLÍNICO:</span>
-                    <span id="folioDisplay" class="font-mono font-black text-yellow-300 text-sm">JY-2026-1043</span>
-                </div>
+        </header>
+
+        <div class="max-w-4xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center no-print bg-white my-4 rounded-2xl shadow-sm border border-slate-200 gap-3">
+            <div class="flex items-center space-x-2 text-xs">
+                <span class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span class="text-slate-700 font-bold">Modo Tablet Táctil Activo - Todas las firmas habilitadas</span>
+            </div>
+            <div class="flex space-x-2.5">
+                <button onclick="showResetModal()" class="px-3.5 py-2 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition border border-rose-200 shadow-sm cursor-pointer">
+                    Limpiar Todo
+                </button>
+                <button id="btnGeneratePDF" onclick="generatePDF()" class="px-4 py-2 text-xs font-bold text-white bg-cyan-800 hover:bg-cyan-900 rounded-xl transition shadow-md flex items-center space-x-2 cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    <span id="btnPdfText">Imprimir / Guardar PDF Oficial</span>
+                </button>
             </div>
         </div>
-    </header>
 
-    <div class="max-w-4xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center no-print bg-white my-4 rounded-2xl shadow-sm border border-slate-200 gap-3">
-        <div class="flex items-center space-x-2 text-xs">
-            <span class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></span>
-            <span class="text-slate-700 font-bold">Modo Tablet Táctil Activo - Todas las firmas habilitadas</span>
-        </div>
-        <div class="flex space-x-2.5">
-            <button onclick="resetForm()" class="px-3.5 py-2 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition border border-rose-200 shadow-sm cursor-pointer">
-                Limpiar Todo
-            </button>
-            <button onclick="window.print()" class="px-4 py-2 text-xs font-bold text-white bg-cyan-800 hover:bg-cyan-900 rounded-xl transition shadow-md flex items-center space-x-2 cursor-pointer">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                <span>Imprimir / Guardar PDF Oficial</span>
-            </button>
-        </div>
-    </div>
-
-    <main class="max-w-4xl mx-auto px-4">
-        <div class="unified-sheet bg-white shadow-2xl rounded-3xl p-6 md:p-12 border border-slate-200 space-y-8">
-            
-            <!-- HEADER PAGE 1 -->
-            <div class="border-b-2 border-cyan-950 pb-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 class="text-2xl font-black text-cyan-950 tracking-wider">MEDICAL SERVICES</h2>
-                    <p class="text-[11px] text-slate-500 font-bold tracking-wide">CONSULTORIO: JOYA MEDICAL SERVICES - HOSPITAL JOYA PLAYA DEL CARMEN</p>
+        <main class="max-w-4xl mx-auto px-4">
+            <!-- Contenedor principal con menos padding y spacing para ser más compacto -->
+            <div class="unified-sheet bg-white shadow-2xl rounded-3xl p-4 md:p-8 border border-slate-200 space-y-5">
+                
+                <!-- HEADER PAGE 1 -->
+                <div class="border-b-2 border-cyan-950 pb-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 avoid-break">
+                    <div>
+                        <h2 class="text-2xl font-black text-cyan-950 tracking-wider">MEDICAL SERVICES</h2>
+                        <p class="text-[11px] text-slate-500 font-bold tracking-wide">CONSULTORIO: JOYA MEDICAL SERVICES - HOSPITAL JOYA PLAYA DEL CARMEN</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] font-black text-slate-400 block uppercase">FECHA Y HORA ACTUAL</span>
+                        <span id="currentDate" class="text-xs font-extrabold text-slate-700"></span>
+                    </div>
                 </div>
-                <div class="text-right">
-                    <span class="text-[10px] font-black text-slate-400 block uppercase">FECHA ACTUAL</span>
-                    <span id="currentDate" class="text-xs font-extrabold text-slate-700"></span>
-                </div>
-            </div>
 
-            <!-- PATIENT DATA SECTION -->
-            <div class="bg-cyan-50/50 p-5 rounded-2xl border border-cyan-100 space-y-4">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-[11px] font-black uppercase tracking-wider text-cyan-950 bg-cyan-200/80 px-3 py-1.5 rounded-lg shadow-sm">
-                        DATOS DEL PACIENTE - TO BE COMPLETED BY PATIENT
+                <!-- PATIENT DATA SECTION -->
+                <div class="bg-cyan-50/50 p-3 rounded-2xl border border-cyan-100 space-y-3 avoid-break">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-[11px] font-black uppercase tracking-wider text-cyan-950 bg-cyan-200/80 px-2.5 py-1 rounded-lg shadow-sm">
+                            DATOS DEL PACIENTE - TO BE COMPLETED BY PATIENT
+                        </h3>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-2 text-[11px]">
+                        <div class="md:col-span-6">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Nombre del paciente | Patient's name</label>
+                            <input id="f_patName" type="text" placeholder="Nombre completo" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Edad | Age</label>
+                            <input id="f_patAge" type="number" placeholder="Años" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+                        <div class="md:col-span-4">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Nacimiento | Date of Birth</label>
+                            <input id="f_patDob" type="date" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+
+                        <div class="md:col-span-3">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Sexo | Gender</label>
+                            <select id="f_patGender" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                                <option value="">Seleccione...</option>
+                                <option value="Masculino">Masculino / Male</option>
+                                <option value="Femenino">Femenino / Female</option>
+                                <option value="Otro">Otro / Other</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-5">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Ocupación | Occupation</label>
+                            <input id="f_patOcc" type="text" placeholder="Ocupación" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+                        <div class="md:col-span-4">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Teléfono | Phone Number</label>
+                            <input id="f_patPhone" type="tel" placeholder="+52 ..." class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+
+                        <div class="md:col-span-6">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Domicilio Permanente | Home Address</label>
+                            <input id="f_patAddress" type="text" placeholder="Calle, número, etc." class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Ciudad | City</label>
+                            <input id="f_patCity" type="text" placeholder="Ciudad" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block font-semibold text-slate-700 mb-0.5">C.P. | Zip Code</label>
+                            <input id="f_patZip" type="text" placeholder="Código Postal" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+
+                        <div class="md:col-span-3">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Estado | State</label>
+                            <input id="f_patState" type="text" placeholder="Estado" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block font-semibold text-slate-700 mb-0.5">País | Country</label>
+                            <input id="f_patCountry" type="text" placeholder="País" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+                        <div class="md:col-span-6">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Hotel y Habitación | Hotel and Room Number</label>
+                            <input id="f_patHotel" type="text" placeholder="Ej. Grand Hotel, Hab. 402" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+
+                        <div class="md:col-span-6">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Llegada | Check in Date</label>
+                            <input id="f_patCheckIn" type="date" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+                        <div class="md:col-span-6">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Salida | Check out Date</label>
+                            <input id="f_patCheckOut" type="date" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Consent text -->
+                    <div class="text-[9px] text-slate-600 bg-white p-2.5 rounded-lg border border-cyan-100 leading-relaxed italic shadow-sm">
+                        "Otorgaré consentimiento y proporcionaré al médico información con el fin de valorar mi estado de salud, certificando que la información proporcionada es verdadera y sin omisiones, de la misma manera me comprometo a pagar los servicios abajo descritos brindados por la institución. / I will give medical consent and will provide information to assess my health, certifying that the information provided is true and without omissions, in the same way I accept to pay the services described below provided by the doctor"
+                    </div>
+
+                    <!-- Patient Signature 1 -->
+                    <div class="pt-1 avoid-break">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-[11px] font-extrabold text-slate-700">Firma de Paciente o Persona que Autoriza | Patient's Signature</label>
+                            <button onclick="clearSignature('sigPatient')" class="text-[10px] text-rose-600 hover:underline font-bold no-print cursor-pointer">Limpiar Firma</button>
+                        </div>
+                        <div class="border-2 border-dashed border-cyan-300 bg-white rounded-xl relative overflow-hidden shadow-sm h-20 md:h-24">
+                            <canvas id="sigPatient"></canvas>
+                            <div class="absolute bottom-1 right-2 text-[9px] text-slate-400 font-medium pointer-events-none">Firme aquí con el dedo o lápiz táctil</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VITAL SIGNS SECTION -->
+                <div class="space-y-2 avoid-break">
+                    <h3 class="text-[11px] font-black uppercase tracking-wider text-cyan-950 bg-cyan-100 px-2.5 py-1 rounded-lg">
+                        Exploración Física y Signos Vitales | Physical Exam & Vital Signs
                     </h3>
-                </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5 text-xs">
-                    <div class="md:col-span-6">
-                        <label class="block font-semibold text-slate-700 mb-1">Nombre del paciente | Patient's name</label>
-                        <input type="text" placeholder="Nombre completo" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="block font-semibold text-slate-700 mb-1">Edad | Age</label>
-                        <input type="number" placeholder="Años" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                    </div>
-                    <div class="md:col-span-4">
-                        <label class="block font-semibold text-slate-700 mb-1">Nacimiento | Date of Birth</label>
-                        <input type="date" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-0.5">Fecha de Atención</label>
+                            <input id="f_vitDate" type="date" class="w-full p-1.5 bg-slate-50 border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-0.5">Peso (kg)</label>
+                            <input id="f_vitWeight" type="text" placeholder="Ej. 70" class="w-full p-1.5 bg-slate-50 border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-0.5">Talla (cm)</label>
+                            <input id="f_vitHeight" type="text" placeholder="Ej. 175" class="w-full p-1.5 bg-slate-50 border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-0.5">Temperatura (°C)</label>
+                            <input id="f_vitTemp" type="text" placeholder="Ej. 36.5" class="w-full p-1.5 bg-slate-50 border border-slate-300 rounded-lg">
+                        </div>
 
-                    <div class="md:col-span-3">
-                        <label class="block font-semibold text-slate-700 mb-1">Sexo | Gender</label>
-                        <select class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                            <option value="">Seleccione...</option>
-                            <option value="M">Masculino / Male</option>
-                            <option value="F">Femenino / Female</option>
-                            <option value="O">Otro / Other</option>
-                        </select>
-                    </div>
-                    <div class="md:col-span-5">
-                        <label class="block font-semibold text-slate-700 mb-1">Ocupación | Occupation</label>
-                        <input type="text" placeholder="Ocupación" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                    </div>
-                    <div class="md:col-span-4">
-                        <label class="block font-semibold text-slate-700 mb-1">Teléfono | Phone Number</label>
-                        <input type="tel" placeholder="+52 ..." class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                    </div>
-
-                    <div class="md:col-span-6">
-                        <label class="block font-semibold text-slate-700 mb-1">Domicilio Permanente | Home Address</label>
-                        <input type="text" placeholder="Calle, número, etc." class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                    </div>
-                    <div class="md:col-span-3">
-                        <label class="block font-semibold text-slate-700 mb-1">Ciudad | City</label>
-                        <input type="text" placeholder="Ciudad" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                    </div>
-                    <div class="md:col-span-3">
-                        <label class="block font-semibold text-slate-700 mb-1">C.P. | Zip Code</label>
-                        <input type="text" placeholder="Código Postal" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                    </div>
-
-                    <div class="md:col-span-3">
-                        <label class="block font-semibold text-slate-700 mb-1">Estado | State</label>
-                        <input type="text" placeholder="Estado" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                    </div>
-                    <div class="md:col-span-3">
-                        <label class="block font-semibold text-slate-700 mb-1">País | Country</label>
-                        <input type="text" placeholder="País" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                    </div>
-                    <div class="md:col-span-6">
-                        <label class="block font-semibold text-slate-700 mb-1">Hotel y Habitación | Hotel and Room Number</label>
-                        <input type="text" placeholder="Ej. Grand Hotel, Hab. 402" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                    </div>
-
-                    <div class="md:col-span-6">
-                        <label class="block font-semibold text-slate-700 mb-1">Llegada | Check in Date</label>
-                        <input type="date" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
-                    </div>
-                    <div class="md:col-span-6">
-                        <label class="block font-semibold text-slate-700 mb-1">Salida | Check out Date</label>
-                        <input type="date" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-600 outline-none">
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-0.5">Frecuencia Cardiaca (bpm)</label>
+                            <input id="f_vitHr" type="text" placeholder="Ej. 80" class="w-full p-1.5 bg-slate-50 border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-0.5">Frecuencia Respiratoria</label>
+                            <input id="f_vitRr" type="text" placeholder="Ej. 18" class="w-full p-1.5 bg-slate-50 border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-0.5">Tensión Arterial (mmHg)</label>
+                            <input id="f_vitBp" type="text" placeholder="Ej. 120/80" class="w-full p-1.5 bg-slate-50 border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-0.5">Saturación de Oxígeno (%)</label>
+                            <input id="f_vitSpo2" type="text" placeholder="Ej. 98%" class="w-full p-1.5 bg-slate-50 border border-slate-300 rounded-lg">
+                        </div>
                     </div>
                 </div>
 
-                <!-- Consent text -->
-                <div class="text-[10px] text-slate-600 bg-white p-4 rounded-xl border border-cyan-100 leading-relaxed italic shadow-sm">
-                    "Otorgaré consentimiento y proporcionaré al médico información con el fin de valorar mi estado de salud, certificando que la información proporcionada es verdadera y sin omisiones, de la misma manera me comprometo a pagar los servicios abajo descritos brindados por la institución. / I will give medical consent and will provide information to assess my health, certifying that the information provided is true and without omissions, in the same way I accept to pay the services described below provided by the doctor"
-                </div>
-
-                <!-- Patient Signature 1 -->
-                <div class="pt-2">
-                    <div class="flex justify-between items-center mb-1.5">
-                        <label class="text-[11px] font-extrabold text-slate-700">Firma de Paciente o Persona que Autoriza | Patient's Signature</label>
-                        <button onclick="clearSignature('sigPatient')" class="text-[11px] text-rose-600 hover:underline font-bold no-print cursor-pointer">Limpiar Firma</button>
-                    </div>
-                    <div class="border-2 border-dashed border-cyan-300 bg-white rounded-2xl relative overflow-hidden shadow-sm h-32">
-                        <canvas id="sigPatient"></canvas>
-                        <div class="absolute bottom-1.5 right-3 text-[10px] text-slate-400 font-medium pointer-events-none">Firme aquí con el dedo o lápiz táctil</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- VITAL SIGNS SECTION -->
-            <div class="space-y-3">
-                <h3 class="text-[11px] font-black uppercase tracking-wider text-cyan-950 bg-cyan-100 px-3 py-1.5 rounded-lg">
-                    Exploración Física y Signos Vitales | Physical Exam & Vital Signs
-                </h3>
-
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                    <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Fecha de Atención</label>
-                        <input type="date" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Peso (kg)</label>
-                        <input type="text" placeholder="Ej. 70" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Talla (cm)</label>
-                        <input type="text" placeholder="Ej. 175" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Temperatura (°C)</label>
-                        <input type="text" placeholder="Ej. 36.5" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                    </div>
-
-                    <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Frecuencia Cardiaca (bpm)</label>
-                        <input type="text" placeholder="Ej. 80" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Frecuencia Respiratoria</label>
-                        <input type="text" placeholder="Ej. 18" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Tensión Arterial (mmHg)</label>
-                        <input type="text" placeholder="Ej. 120/80" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Saturación de Oxígeno (%)</label>
-                        <input type="text" placeholder="Ej. 98%" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                    </div>
-                </div>
-            </div>
-
-            <!-- PHYSICIAN REPORT SECTION -->
-            <div class="space-y-3.5 bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                <h3 class="text-[11px] font-black uppercase tracking-wider text-slate-900 bg-slate-200 px-3 py-1.5 rounded-lg">
-                    REPORTE MÉDICO - TO BE COMPLETED BY PHYSICIAN
-                </h3>
-
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5 text-xs">
-                    <div class="md:col-span-8">
-                        <label class="block font-semibold text-slate-700 mb-1">Fecha y Hora | Date and Time</label>
-                        <input type="datetime-local" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl">
-                    </div>
-                    <div class="md:col-span-4 flex items-center pt-5">
-                        <label class="flex items-center space-x-2.5 cursor-pointer">
-                            <input type="checkbox" class="w-4 h-4 text-cyan-700 rounded">
-                            <span class="font-bold text-rose-600">¿Es Emergencia? / Is Emergency?</span>
+                <!-- PHYSICIAN REPORT SECTION -->
+                <div class="space-y-2 bg-slate-50 p-3 rounded-2xl border border-slate-200 avoid-break">
+                    <div class="flex justify-between items-center bg-slate-200 px-2.5 py-1.5 rounded-lg">
+                        <h3 class="text-[11px] font-black uppercase tracking-wider text-slate-900">
+                            REPORTE MÉDICO - TO BE COMPLETED BY PHYSICIAN
+                        </h3>
+                        <label class="flex items-center space-x-2 bg-rose-50 px-3 py-1 rounded-md border border-rose-100 cursor-pointer">
+                            <input id="f_repEmergency" type="checkbox" class="w-4 h-4 text-rose-600 rounded">
+                            <span class="font-bold text-rose-600 text-[10px]">¿Emergencia?</span>
                         </label>
                     </div>
 
-                    <div class="md:col-span-12">
-                        <label class="block font-semibold text-slate-700 mb-1">Motivo de Consulta | Chief Complaint</label>
-                        <textarea rows="2" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl" placeholder="Describa el motivo de la visita..."></textarea>
-                    </div>
-
-                    <div class="md:col-span-12">
-                        <label class="block font-semibold text-slate-700 mb-1">Evolución del Padecimiento Actual | History of Present Illness</label>
-                        <textarea rows="2" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl" placeholder="Evolución clínica..."></textarea>
-                    </div>
-
-                    <div class="md:col-span-6">
-                        <label class="block font-semibold text-slate-700 mb-1">Inspección por Aparatos y Sistemas | Review of Systems</label>
-                        <textarea rows="2" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl" placeholder="Hallazgos..."></textarea>
-                    </div>
-                    <div class="md:col-span-6">
-                        <label class="block font-semibold text-slate-700 mb-1">Antecedentes Patológicos | Past, Family, Social History</label>
-                        <textarea rows="2" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl" placeholder="Antecedentes..."></textarea>
-                    </div>
-
-                    <div class="md:col-span-6">
-                        <label class="block font-semibold text-slate-700 mb-1">Medicamentos | Medications</label>
-                        <textarea rows="2" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl" placeholder="Medicamentos actuales..."></textarea>
-                    </div>
-                    <div class="md:col-span-6">
-                        <label class="block font-semibold text-slate-700 mb-1">Alergias | Allergies</label>
-                        <textarea rows="2" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl" placeholder="Alergias conocidas..."></textarea>
-                    </div>
-
-                    <div class="md:col-span-6">
-                        <label class="block font-semibold text-slate-700 mb-1">Diagnóstico(s) | Diagnosis</label>
-                        <textarea rows="2" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl" placeholder="Diagnósticos médicos..."></textarea>
-                    </div>
-                    <div class="md:col-span-6">
-                        <label class="block font-semibold text-slate-700 mb-1">Tratamiento | Prescribed Treatment</label>
-                        <textarea rows="2" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl" placeholder="Tratamiento indicado..."></textarea>
-                    </div>
-                </div>
-            </div>
-
-            <!-- PAYMENT & CHARGES SECTION -->
-            <div class="space-y-4">
-                <h3 class="text-[11px] font-black uppercase tracking-wider text-cyan-950 bg-cyan-100 px-3 py-1.5 rounded-lg">
-                    MÉTODO DE PAGO Y CONCEPTOS | PAYMENT METHOD & CHARGES
-                </h3>
-
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                    <label class="flex items-center space-x-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100">
-                        <input type="checkbox" name="payMethod" class="text-cyan-700 w-4 h-4 rounded">
-                        <span class="font-bold text-slate-700">CONSULTA</span>
-                    </label>
-                    <label class="flex items-center space-x-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100">
-                        <input type="checkbox" name="payMethod" class="text-cyan-700 w-4 h-4 rounded">
-                        <span class="font-bold text-slate-700">RESP. HOTEL</span>
-                    </label>
-                    <label class="flex items-center space-x-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100">
-                        <input type="checkbox" name="payMethod" class="text-cyan-700 w-4 h-4 rounded">
-                        <span class="font-bold text-slate-700">PAGO HOSPITAL</span>
-                    </label>
-                    <label class="flex items-center space-x-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100">
-                        <input type="checkbox" name="payMethod" class="text-cyan-700 w-4 h-4 rounded">
-                        <span class="font-bold text-slate-700">ASEGURADORA</span>
-                    </label>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                    <div>
-                        <label class="block font-semibold text-slate-600 mb-1">CUENTA PACIENTE / N° DE CUENTA</label>
-                        <input type="text" placeholder="Número de cuenta" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-slate-600 mb-1">N° DE PÓLIZA</label>
-                        <input type="text" placeholder="Póliza de seguro" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-slate-600 mb-1">HOSPITAL</label>
-                        <input type="text" value="Hospital Joya Playa del Carmen" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-bold">
-                    </div>
-                </div>
-
-                <!-- Charges Table -->
-                <div class="overflow-x-auto border border-slate-200 rounded-2xl shadow-sm">
-                    <table class="w-full text-left text-xs">
-                        <thead class="bg-cyan-950 text-white font-bold">
-                            <tr>
-                                <th class="p-3">Conceptos | Services, Procedures or Supplies</th>
-                                <th class="p-3 w-28 text-center">Unidades | Units</th>
-                                <th class="p-3 w-36 text-right">Cargos | Charges</th>
-                            </tr>
-                        </thead>
-                        <tbody id="chargesTableBody" class="divide-y divide-slate-200 bg-white font-medium">
-                            <tr>
-                                <td class="p-2.5"><input type="text" value="Consulta Médica" class="w-full p-1 border-0 focus:ring-0"></td>
-                                <td class="p-2.5"><input type="number" value="1" class="w-full p-1 text-center border-0 focus:ring-0"></td>
-                                <td class="p-2.5"><input type="text" placeholder="0.00" class="w-full p-1 text-right border-0 focus:ring-0"></td>
-                            </tr>
-                            <tr>
-                                <td class="p-2.5"><input type="text" value="Medicamentos / Insumos" class="w-full p-1 border-0 focus:ring-0"></td>
-                                <td class="p-2.5"><input type="number" value="1" class="w-full p-1 text-center border-0 focus:ring-0"></td>
-                                <td class="p-2.5"><input type="text" placeholder="0.00" class="w-full p-1 text-right border-0 focus:ring-0"></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="flex justify-end text-xs bg-slate-50 p-4 rounded-2xl border">
-                    <div class="text-right space-y-1.5 font-bold">
-                        <div>TOTAL MXN: <input type="text" placeholder="$0.00" class="w-36 p-1.5 bg-white border rounded-xl text-right ml-2 font-extrabold text-slate-900"></div>
-                        <div>TIPO DE CAMBIO: <input type="text" placeholder="18.50" class="w-36 p-1.5 bg-white border rounded-xl text-right ml-2"></div>
-                        <div>TOTAL PAGADO USD: <input type="text" placeholder="$0.00" class="w-36 p-1.5 bg-white border rounded-xl text-right ml-2 font-extrabold text-cyan-800"></div>
-                    </div>
-                </div>
-
-                <!-- Physician Signature -->
-                <div class="pt-2">
-                    <div class="flex justify-between items-center mb-1.5">
-                        <label class="text-[11px] font-extrabold text-slate-700">Nombre, Firma y Licencia del Médico | Physician's Name, Signature and License</label>
-                        <button onclick="clearSignature('sigPhysician')" class="text-[11px] text-rose-600 hover:underline font-bold no-print cursor-pointer">Limpiar Firma</button>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input type="text" placeholder="Dr. Nombre Apellido - Cédula Profesional" class="w-full p-3 bg-white border border-slate-300 rounded-2xl text-xs self-center font-bold">
-                        <div class="border-2 border-dashed border-cyan-300 bg-white rounded-2xl relative overflow-hidden h-32 shadow-sm">
-                            <canvas id="sigPhysician"></canvas>
-                            <div class="absolute bottom-1.5 right-3 text-[10px] text-slate-400 font-medium pointer-events-none">Firma del Médico</div>
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-2 text-[11px]">
+                        <div class="md:col-span-12">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Motivo de Consulta | Chief Complaint</label>
+                            <textarea id="f_repComplaint" rows="1" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg min-h-[32px] resize-y" placeholder="Describa el motivo de la visita..."></textarea>
                         </div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- PAGE 2 SECTION (UNIFIED CONTINUOUSLY) -->
-            <div class="page-break-before pt-8 border-t-4 border-dashed border-slate-200 space-y-6">
-                
-                <div class="border-b-2 border-cyan-950 pb-5 flex justify-between items-center">
-                    <div>
-                        <h2 class="text-xl font-black text-cyan-950 tracking-wider">RECHAZO DE SERVICIO MÉDICO</h2>
-                        <p class="text-[11px] text-slate-500 font-bold tracking-wide">REFUSAL OF MEDICAL SERVICE</p>
-                    </div>
-                    <div class="text-xs font-black text-cyan-900 bg-cyan-100 px-3.5 py-2 rounded-xl shadow-sm">
-                        FECHA: <span id="currentDatePage2"></span>
-                    </div>
-                </div>
+                        <div class="md:col-span-12">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Evolución del Padecimiento Actual | History of Present Illness</label>
+                            <textarea id="f_repHistory" rows="1" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg min-h-[32px] resize-y" placeholder="Evolución clínica..."></textarea>
+                        </div>
 
-                <!-- Refusal Text Box -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-[11px] leading-relaxed text-slate-700 bg-amber-50/60 p-6 rounded-3xl border border-amber-200 shadow-sm">
-                    <div class="space-y-2.5">
-                        <p class="font-extrabold text-amber-950 text-xs uppercase tracking-wide">Español:</p>
-                        <p class="text-slate-800">
-                            A pesar de la recomendación del médico, <strong>ME NIEGO A RECIBIR ATENCIÓN MÉDICA</strong>. El médico me ha explicado los riesgos consiguientes a mi negativa. Al firmar este documento, yo reconozco que mi estado de salud ha sido evaluado y explicado por el médico, quien ha recomendado tratamiento como se mencionó anteriormente lo que comprendo perfectamente. A pesar de esta compresión, ME NIEGO A ACEPTAR ESTA ATENCIÓN O TRATAMIENTO MÉDICO. Yo asumo toda la responsabilidad derivada de mi decisión y exonero de cualquier responsabilidad al médico, personal del hotel y otras personas involucradas en mi atención médica.
-                        </p>
-                    </div>
-                    <div class="space-y-2.5 border-t md:border-t-0 md:border-l border-amber-200 pt-4 md:pt-0 md:pl-6">
-                        <p class="font-extrabold text-amber-950 text-xs uppercase tracking-wide">English:</p>
-                        <p class="text-slate-800">
-                            Despite the physician's recommendation, <strong>I REFUSE TO CONSENT TO MEDICAL CARE</strong>. The physician has explained the risk entailed by my refusal. By signing this document, I acknowledge that my health status has been evaluated and explained by the physician, whom has recommended treatment as stated above, which i fully understand. Regardless of this understanding, I REFUSE TO CONSENT TO ANY MEDICAL CARE OR TREATMENT. I assume full responsability arising out of such refusal and release the physician, hotel staff and any other people involved in my medical care from any liability.
-                        </p>
-                    </div>
-                </div>
+                        <div class="md:col-span-6">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Inspección por Aparatos y Sistemas | Review of Systems</label>
+                            <textarea id="f_repSystems" rows="1" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg min-h-[32px] resize-y" placeholder="Hallazgos..."></textarea>
+                        </div>
+                        <div class="md:col-span-6">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Antecedentes Patológicos | Past, Family, Social History</label>
+                            <textarea id="f_repPast" rows="1" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg min-h-[32px] resize-y" placeholder="Antecedentes..."></textarea>
+                        </div>
 
-                <!-- Signatures Grid Page 2 -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
-                    <div>
-                        <div class="flex justify-between items-center mb-1.5">
-                            <label class="text-[10px] font-black text-slate-700">Firma y nombre del paciente</label>
-                            <button onclick="clearSignature('sigRefusalPatient')" class="text-[9px] text-rose-600 hover:underline font-bold no-print cursor-pointer">Limpiar</button>
+                        <div class="md:col-span-6">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Medicamentos | Medications</label>
+                            <textarea id="f_repMeds" rows="1" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg min-h-[32px] resize-y" placeholder="Medicamentos actuales..."></textarea>
                         </div>
-                        <input type="text" placeholder="Nombre del Paciente" class="w-full p-2 text-xs bg-white border border-slate-300 rounded-xl mb-2 font-semibold">
-                        <div class="border-2 border-dashed border-slate-300 bg-white rounded-2xl relative overflow-hidden h-32 shadow-sm">
-                            <canvas id="sigRefusalPatient"></canvas>
-                            <div class="absolute bottom-1 right-2 text-[9px] text-slate-400 pointer-events-none">Firma paciente</div>
+                        <div class="md:col-span-6">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Alergias | Allergies</label>
+                            <textarea id="f_repAllergies" rows="1" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg min-h-[32px] resize-y" placeholder="Alergias conocidas..."></textarea>
                         </div>
-                    </div>
 
-                    <div>
-                        <div class="flex justify-between items-center mb-1.5">
-                            <label class="text-[10px] font-black text-slate-700">Firma primer testigo</label>
-                            <button onclick="clearSignature('sigWitness1')" class="text-[9px] text-rose-600 hover:underline font-bold no-print cursor-pointer">Limpiar</button>
+                        <div class="md:col-span-6">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Diagnóstico(s) | Diagnosis</label>
+                            <textarea id="f_repDiag" rows="1" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg min-h-[32px] resize-y" placeholder="Diagnósticos médicos..."></textarea>
                         </div>
-                        <input type="text" placeholder="Nombre Testigo 1" class="w-full p-2 text-xs bg-white border border-slate-300 rounded-xl mb-2 font-semibold">
-                        <div class="border-2 border-dashed border-slate-300 bg-white rounded-2xl relative overflow-hidden h-32 shadow-sm">
-                            <canvas id="sigWitness1"></canvas>
-                            <div class="absolute bottom-1 right-2 text-[9px] text-slate-400 pointer-events-none">Firma testigo 1</div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="flex justify-between items-center mb-1.5">
-                            <label class="text-[10px] font-black text-slate-700">Firma segundo testigo</label>
-                            <button onclick="clearSignature('sigWitness2')" class="text-[9px] text-rose-600 hover:underline font-bold no-print cursor-pointer">Limpiar</button>
-                        </div>
-                        <input type="text" placeholder="Nombre Testigo 2" class="w-full p-2 text-xs bg-white border border-slate-300 rounded-xl mb-2 font-semibold">
-                        <div class="border-2 border-dashed border-slate-300 bg-white rounded-2xl relative overflow-hidden h-32 shadow-sm">
-                            <canvas id="sigWitness2"></canvas>
-                            <div class="absolute bottom-1 right-2 text-[9px] text-slate-400 pointer-events-none">Firma testigo 2</div>
+                        <div class="md:col-span-6">
+                            <label class="block font-semibold text-slate-700 mb-0.5">Tratamiento | Prescribed Treatment</label>
+                            <textarea id="f_repTreatment" rows="1" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg min-h-[32px] resize-y" placeholder="Tratamiento indicado..."></textarea>
                         </div>
                     </div>
                 </div>
 
-                <!-- Tax Invoice Data Section -->
-                <div class="space-y-3.5 pt-4 border-t border-slate-200">
-                    <h3 class="text-[11px] font-black uppercase tracking-wider text-cyan-950 bg-cyan-100 px-3 py-1.5 rounded-lg">
-                        EN CASO DE REQUERIR FACTURA / DATOS FISCALES (TAX INVOICE DATA)
+                <!-- PAYMENT & CHARGES SECTION -->
+                <div class="space-y-3 avoid-break">
+                    <h3 class="text-[11px] font-black uppercase tracking-wider text-cyan-950 bg-cyan-100 px-2.5 py-1 rounded-lg">
+                        MÉTODO DE PAGO Y CONCEPTOS | PAYMENT METHOD & CHARGES
                     </h3>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-1.5 text-[10px]">
+                        <label class="flex items-center space-x-1.5 p-1.5 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100">
+                            <input id="f_payConsulta" type="checkbox" class="text-cyan-700 w-3.5 h-3.5 rounded">
+                            <span class="font-bold text-slate-700">CONSULTA</span>
+                        </label>
+                        <label class="flex items-center space-x-1.5 p-1.5 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100">
+                            <input id="f_payResp" type="checkbox" class="text-cyan-700 w-3.5 h-3.5 rounded">
+                            <span class="font-bold text-slate-700">RESP. HOTEL</span>
+                        </label>
+                        <label class="flex items-center space-x-1.5 p-1.5 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100">
+                            <input id="f_payHosp" type="checkbox" class="text-cyan-700 w-3.5 h-3.5 rounded">
+                            <span class="font-bold text-slate-700">PAGO HOSPITAL</span>
+                        </label>
+                        <label class="flex items-center space-x-1.5 p-1.5 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100">
+                            <input id="f_payInsur" type="checkbox" class="text-cyan-700 w-3.5 h-3.5 rounded">
+                            <span class="font-bold text-slate-700">ASEGURADORA</span>
+                        </label>
+                        <label class="flex items-center space-x-1.5 p-1.5 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100">
+                            <input id="f_payCredit" type="checkbox" class="text-cyan-700 w-3.5 h-3.5 rounded">
+                            <span class="font-bold text-slate-700">T. CRÉDITO</span>
+                        </label>
+                        <label class="flex items-center space-x-1.5 p-1.5 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100">
+                            <input id="f_payCash" type="checkbox" class="text-cyan-700 w-3.5 h-3.5 rounded">
+                            <span class="font-bold text-slate-700">EFECTIVO</span>
+                        </label>
+                        <label class="flex items-center space-x-1.5 p-1.5 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100">
+                            <input id="f_payRoom" type="checkbox" class="text-cyan-700 w-3.5 h-3.5 rounded">
+                            <span class="font-bold text-slate-700">CARGO HAB.</span>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
                         <div>
-                            <label class="block font-semibold text-slate-700 mb-1">Razón Social | Business Name</label>
-                            <input type="text" placeholder="Nombre o Razón Social" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl">
+                            <label class="block font-semibold text-slate-600 mb-0.5">CUENTA PACIENTE / N° DE CUENTA</label>
+                            <input id="f_payAccount" type="text" placeholder="Número de cuenta" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg">
                         </div>
                         <div>
-                            <label class="block font-semibold text-slate-700 mb-1">RFC / Tax ID</label>
-                            <input type="text" placeholder="RFC con homoclave" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block font-semibold text-slate-700 mb-1">Dirección Fiscal | Tax Address</label>
-                            <input type="text" placeholder="Calle, Número, Colonia, Municipio, Estado, C.P." class="w-full p-2.5 bg-white border border-slate-300 rounded-xl">
+                            <label class="block font-semibold text-slate-600 mb-0.5">N° DE PÓLIZA</label>
+                            <input id="f_payPolicy" type="text" placeholder="Póliza de seguro" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg">
                         </div>
                         <div>
-                            <label class="block font-semibold text-slate-700 mb-1">Teléfono | Phone</label>
-                            <input type="tel" placeholder="Teléfono de contacto" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl">
+                            <label class="block font-semibold text-slate-600 mb-0.5">HOSPITAL</label>
+                            <input id="f_payHospital" type="text" value="Hospital Joya Playa del Carmen" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg font-bold">
                         </div>
-                        <div>
-                            <label class="block font-semibold text-slate-700 mb-1">Correo Electrónico | Email for Invoice</label>
-                            <input type="email" placeholder="correo@ejemplo.com" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl">
+                    </div>
+
+                    <!-- Charges Table -->
+                    <div class="overflow-x-auto border border-slate-200 rounded-xl shadow-sm">
+                        <table class="w-full text-left text-[11px]">
+                            <thead class="bg-cyan-950 text-white font-bold">
+                                <tr>
+                                    <th class="p-2">Conceptos | Services, Procedures or Supplies</th>
+                                    <th class="p-2 w-24 text-center">Unidades | Units</th>
+                                    <th class="p-2 w-32 text-right">Cargos | Charges</th>
+                                </tr>
+                            </thead>
+                            <tbody id="chargesTableBody" class="divide-y divide-slate-200 bg-white font-medium">
+                                <tr>
+                                    <td class="p-1"><input type="text" value="Consulta Médica" class="w-full p-1 border-0 focus:ring-0 text-[11px]"></td>
+                                    <td class="p-1"><input type="number" value="1" class="w-full p-1 text-center border-0 focus:ring-0 text-[11px]"></td>
+                                    <td class="p-1"><input type="text" placeholder="0.00" class="w-full p-1 text-right border-0 focus:ring-0 text-[11px]"></td>
+                                </tr>
+                                <tr>
+                                    <td class="p-1"><input type="text" value="Medicamentos / Insumos" class="w-full p-1 border-0 focus:ring-0 text-[11px]"></td>
+                                    <td class="p-1"><input type="number" value="1" class="w-full p-1 text-center border-0 focus:ring-0 text-[11px]"></td>
+                                    <td class="p-1"><input type="text" placeholder="0.00" class="w-full p-1 text-right border-0 focus:ring-0 text-[11px]"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="flex justify-end text-[11px] bg-slate-50 p-2.5 rounded-xl border">
+                        <div class="text-right space-y-1 font-bold flex flex-col items-end">
+                            <div class="flex items-center justify-end w-full">TOTAL MXN: <input id="f_totMxn" type="text" placeholder="$0.00" class="w-28 p-1 bg-white border rounded-lg text-right ml-2 font-extrabold text-slate-900"></div>
+                            <div class="flex items-center justify-end w-full">TIPO DE CAMBIO: <input id="f_totExchange" type="text" placeholder="18.50" class="w-28 p-1 bg-white border rounded-lg text-right ml-2"></div>
+                            <div class="flex items-center justify-end w-full">TOTAL USD: <input id="f_totUsd" type="text" placeholder="$0.00" class="w-28 p-1 bg-white border rounded-lg text-right ml-2 font-extrabold text-cyan-800"></div>
+                        </div>
+                    </div>
+
+                    <!-- Physician Signature -->
+                    <div class="pt-1">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-[11px] font-extrabold text-slate-700">Nombre, Firma y Licencia del Médico | Physician's Name, Signature and License</label>
+                            <button onclick="clearSignature('sigPhysician')" class="text-[10px] text-rose-600 hover:underline font-bold no-print cursor-pointer">Limpiar Firma</button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <input id="f_docName" type="text" placeholder="Dr. Nombre Apellido - Cédula Profesional" class="w-full p-2 bg-white border border-slate-300 rounded-xl text-[11px] self-center font-bold">
+                            <div class="border-2 border-dashed border-cyan-300 bg-white rounded-xl relative overflow-hidden h-20 md:h-24 shadow-sm">
+                                <canvas id="sigPhysician"></canvas>
+                                <div class="absolute bottom-1 right-2 text-[9px] text-slate-400 font-medium pointer-events-none">Firma del Médico</div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Footer Company Info -->
-                <div class="text-[10px] text-slate-500 text-center pt-6 border-t border-slate-200 space-y-1 font-semibold">
-                    <p class="font-extrabold text-slate-800 tracking-wide">OPERADORA JOYA RIVIERA MAYA S.A.P.I. DE C.V.</p>
-                    <p>Carretera Federal km. 307, Chetumal-Pto. Juárez, Residencial Campestre, Playa del Carmen, Quintana Roo, México</p>
+                <!-- PAGE 2 SECTION (UNIFIED CONTINUOUSLY) -->
+                <div class="page-break-before pt-5 border-t-4 border-dashed border-slate-200 space-y-4">
+                    
+                    <div class="pb-3 flex justify-between items-center avoid-break">
+                        <div>
+                            <h2 class="text-xl font-black text-cyan-950 tracking-wider">RECHAZO DE SERVICIO MÉDICO</h2>
+                            <p class="text-[10px] text-slate-500 font-bold tracking-wide">REFUSAL OF MEDICAL SERVICE</p>
+                        </div>
+                        <div class="text-[11px] font-black text-cyan-900 bg-cyan-100 px-3 py-1.5 rounded-lg shadow-sm border border-cyan-200">
+                            FECHA Y HORA: <span id="currentDatePage2" class="ml-1 text-cyan-950"></span>
+                        </div>
+                    </div>
+
+                    <!-- Refusal Text Box -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-[10px] leading-relaxed text-slate-700 bg-amber-50/60 p-4 rounded-2xl border border-amber-200 shadow-sm avoid-break">
+                        <div class="space-y-1.5">
+                            <p class="font-extrabold text-amber-950 text-[11px] uppercase tracking-wide">Español:</p>
+                            <p class="text-slate-800 text-justify">
+                                A pesar de la recomendación del médico, <strong>ME NIEGO A RECIBIR ATENCIÓN MÉDICA</strong>. El médico me ha explicado los riesgos consiguientes a mi negativa. Al firmar este documento, yo reconozco que mi estado de salud ha sido evaluado y explicado por el médico, quien ha recomendado tratamiento como se mencionado anteriormente lo que comprendo perfectamente. A pesar de esta compresión, ME NIEGO A ACEPTAR ESTA ATENCIÓN O TRATAMIENTO MÉDICO. Yo asumo toda la responsabilidad derivada de mi decisión y exonero de cualquier responsabilidad al médico, personal del hotel y otras personas involucradas en mi atención médica.
+                            </p>
+                        </div>
+                        <div class="space-y-1.5 border-t md:border-t-0 md:border-l border-amber-200 pt-3 md:pt-0 md:pl-4">
+                            <p class="font-extrabold text-amber-950 text-[11px] uppercase tracking-wide">English:</p>
+                            <p class="text-slate-800 text-justify">
+                                Despite the physician's recommendation, <strong>I REFUSE TO CONSENT TO MEDICAL CARE</strong>. The physician has explained the risk entailed by my refusal. By signing this document, I acknowledge that my health status has been evaluated and explained by the physician, whom has recommended treatment as stated above, which i fully understand. Regardless of this understanding, I REFUSE TO CONSENT TO ANY MEDICAL CARE OR TREATMENT. I assume full responsability arising out of such refusal and release the physician, hotel staff and any other people involved in my medical care from any liability.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Signatures Grid Page 2 -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 avoid-break">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-[10px] font-black text-slate-700">Firma y nombre del paciente</label>
+                                <button onclick="clearSignature('sigRefusalPatient')" class="text-[9px] text-rose-600 hover:underline font-bold no-print cursor-pointer">Limpiar</button>
+                            </div>
+                            <input id="f_refPatName" type="text" placeholder="Nombre del Paciente" class="w-full p-1.5 text-[11px] bg-white border border-slate-300 rounded-lg mb-1.5 font-semibold">
+                            <div class="border-2 border-dashed border-slate-300 bg-white rounded-xl relative overflow-hidden h-20 md:h-24 shadow-sm">
+                                <canvas id="sigRefusalPatient"></canvas>
+                                <div class="absolute bottom-1 right-2 text-[9px] text-slate-400 pointer-events-none">Firma paciente</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-[10px] font-black text-slate-700">Firma primer testigo</label>
+                                <button onclick="clearSignature('sigWitness1')" class="text-[9px] text-rose-600 hover:underline font-bold no-print cursor-pointer">Limpiar</button>
+                            </div>
+                            <input id="f_refWit1Name" type="text" placeholder="Nombre Testigo 1" class="w-full p-1.5 text-[11px] bg-white border border-slate-300 rounded-lg mb-1.5 font-semibold">
+                            <div class="border-2 border-dashed border-slate-300 bg-white rounded-xl relative overflow-hidden h-20 md:h-24 shadow-sm">
+                                <canvas id="sigWitness1"></canvas>
+                                <div class="absolute bottom-1 right-2 text-[9px] text-slate-400 pointer-events-none">Firma testigo 1</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-[10px] font-black text-slate-700">Firma segundo testigo</label>
+                                <button onclick="clearSignature('sigWitness2')" class="text-[9px] text-rose-600 hover:underline font-bold no-print cursor-pointer">Limpiar</button>
+                            </div>
+                            <input id="f_refWit2Name" type="text" placeholder="Nombre Testigo 2" class="w-full p-1.5 text-[11px] bg-white border border-slate-300 rounded-lg mb-1.5 font-semibold">
+                            <div class="border-2 border-dashed border-slate-300 bg-white rounded-xl relative overflow-hidden h-20 md:h-24 shadow-sm">
+                                <canvas id="sigWitness2"></canvas>
+                                <div class="absolute bottom-1 right-2 text-[9px] text-slate-400 pointer-events-none">Firma testigo 2</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tax Invoice Data Section -->
+                    <div class="space-y-2 pt-3 border-t border-slate-200 avoid-break">
+                        <h3 class="text-[11px] font-black uppercase tracking-wider text-cyan-950 bg-cyan-100 px-2.5 py-1 rounded-lg">
+                            EN CASO DE REQUERIR FACTURA / DATOS FISCALES (TAX INVOICE DATA)
+                        </h3>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-0.5">Razón Social | Business Name</label>
+                                <input id="f_taxName" type="text" placeholder="Nombre o Razón Social" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-0.5">RFC / Tax ID</label>
+                                <input id="f_taxRfc" type="text" placeholder="RFC con homoclave" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block font-semibold text-slate-700 mb-0.5">Dirección Fiscal | Tax Address</label>
+                                <input id="f_taxAddress" type="text" placeholder="Calle, Número, Colonia, Municipio, Estado, C.P." class="w-full p-1.5 bg-white border border-slate-300 rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-0.5">Teléfono | Phone</label>
+                                <input id="f_taxPhone" type="tel" placeholder="Teléfono de contacto" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-0.5">Correo Electrónico | Email for Invoice</label>
+                                <input id="f_taxEmail" type="email" placeholder="correo@ejemplo.com" class="w-full p-1.5 bg-white border border-slate-300 rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Company Info -->
+                    <div class="text-[9px] text-slate-500 text-center pt-4 border-t border-slate-200 space-y-0.5 font-semibold avoid-break">
+                        <p class="font-extrabold text-slate-800 tracking-wide text-[10px]">OPERADORA JOYA RIVIERA MAYA S.A.P.I. DE C.V.</p>
+                        <p>Carretera Federal km. 307, Chetumal-Pto. Juárez, Residencial Campestre, Playa del Carmen, Quintana Roo, México</p>
+                    </div>
+
                 </div>
 
+            </div>
+        </main>
+    </div> <!-- End main-app -->
+
+    <!-- PDF EXACT 2-PAGE TEMPLATE (HIDDEN FROM UI) -->
+    <div id="printTemplate">
+        
+        <!-- ==================== PDF PAGE 1 ==================== -->
+        <div class="pdf-page bg-white font-sans text-[10px] leading-snug">
+            
+            <!-- HEADER PAGE 1 -->
+            <div class="border-b-2 border-cyan-950 pb-2 mb-3 flex justify-between items-end">
+                <div>
+                    <h2 class="text-xl font-black text-cyan-950 tracking-wider m-0 p-0 leading-none">MEDICAL SERVICES</h2>
+                    <p class="text-[9px] text-slate-500 font-bold tracking-wide mt-1">JOYA MEDICAL SERVICES - HOSPITAL JOYA PLAYA DEL CARMEN</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[8px] font-bold text-slate-400 uppercase m-0">Fecha y Hora</p>
+                    <p id="p_currentDate" class="text-[10px] font-extrabold text-slate-800 m-0"></p>
+                    <p class="text-[8px] font-bold text-slate-400 uppercase m-0 mt-1">Folio Clínico</p>
+                    <p id="p_folio" class="text-[10px] font-extrabold text-cyan-900 m-0"></p>
+                </div>
+            </div>
+
+            <!-- SECTION 1: DATOS DEL PACIENTE -->
+            <div class="mb-3">
+                <div class="bg-cyan-100 text-cyan-950 px-2 py-1 font-bold uppercase text-[9px] mb-1.5 flex justify-between">
+                    <span>1. DATOS DEL PACIENTE / PATIENT INFORMATION</span>
+                </div>
+                <div class="grid grid-cols-3 gap-x-4 gap-y-1.5">
+                    <div class="col-span-2"><span class="text-slate-500 text-[8px] block">Nombre del paciente:</span> <span id="p_patName" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">N° Cuenta:</span> <span id="p_headerAccount" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    
+                    <div><span class="text-slate-500 text-[8px] block">Edad:</span> <span id="p_patAge" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Fecha Nacimiento:</span> <span id="p_patDob" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Sexo:</span> <span id="p_patGender" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    
+                    <div class="col-span-2"><span class="text-slate-500 text-[8px] block">Ocupación:</span> <span id="p_patOcc" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Teléfono:</span> <span id="p_patPhone" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    
+                    <div class="col-span-3"><span class="text-slate-500 text-[8px] block">Domicilio:</span> <span id="p_patAddress" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    
+                    <div><span class="text-slate-500 text-[8px] block">Ciudad:</span> <span id="p_patCity" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Estado:</span> <span id="p_patState" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">C.P. / País:</span> <span id="p_patZipCountry" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    
+                    <div><span class="text-slate-500 text-[8px] block">Hotel y Habitación:</span> <span id="p_patHotel" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Llegada:</span> <span id="p_patCheckIn" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Salida:</span> <span id="p_patCheckOut" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: CONSENTIMIENTO -->
+            <div class="mb-3">
+                <div class="bg-cyan-100 text-cyan-950 px-2 py-1 font-bold uppercase text-[9px] mb-1.5 flex justify-between">
+                    <span>2. CONSENTIMIENTO Y FIRMA / CONSENT & SIGNATURE</span>
+                </div>
+                <div class="text-[8px] text-justify text-slate-700 italic border border-slate-200 p-1.5 mb-1.5 bg-slate-50">
+                    "Otorgaré consentimiento y proporcionaré al médico información con el fin de valorar mi estado de salud, certificando que la información proporcionada es verdadera y sin omisiones, de la misma manera me comprometo a pagar los servicios abajo descritos brindados por la institución. / I will give medical consent and will provide information to assess my health, certifying that the information provided is true and without omissions, in the same way I accept to pay the services described below provided by the doctor"
+                </div>
+                <div class="w-1/3">
+                    <span class="text-slate-500 text-[8px] block mb-0.5">Firma de Paciente o Persona que Autoriza:</span>
+                    <div class="h-12 border-b-2 border-slate-800 relative">
+                        <img id="p_imgSigPatient" class="absolute bottom-0 left-0 max-h-full max-w-full" src="" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 3: SIGNOS VITALES -->
+            <div class="mb-3">
+                <div class="bg-cyan-100 text-cyan-950 px-2 py-1 font-bold uppercase text-[9px] mb-1.5 flex justify-between">
+                    <span>3. EXPLORACIÓN FÍSICA Y SIGNOS VITALES</span>
+                </div>
+                <div class="grid grid-cols-4 gap-x-4 gap-y-1.5">
+                    <div><span class="text-slate-500 text-[8px] block">Fecha Atención:</span> <span id="p_vitDate" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Peso (kg):</span> <span id="p_vitWeight" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Talla (cm):</span> <span id="p_vitHeight" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Temperatura (°C):</span> <span id="p_vitTemp" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    
+                    <div><span class="text-slate-500 text-[8px] block">Frecuencia Card:</span> <span id="p_vitHr" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Frecuencia Resp:</span> <span id="p_vitRr" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Tensión Arterial:</span> <span id="p_vitBp" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">SpO2 (%):</span> <span id="p_vitSpo2" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                </div>
+            </div>
+
+            <!-- SECTION 4: REPORTE MEDICO -->
+            <div class="flex-grow flex flex-col">
+                <div class="bg-cyan-100 text-cyan-950 px-2 py-1 font-bold uppercase text-[9px] mb-1.5 flex justify-between items-center">
+                    <span>4. REPORTE MÉDICO / MEDICAL REPORT</span>
+                    <span id="p_repEmergency" class="text-rose-700 font-black"></span>
+                </div>
+                <div class="grid grid-cols-1 gap-y-2">
+                    <div><span class="text-slate-500 text-[8px] block">Motivo de Consulta:</span> <span id="p_repComplaint" class="font-semibold text-[10px] block leading-tight text-justify"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Evolución del Padecimiento:</span> <span id="p_repHistory" class="font-semibold text-[10px] block leading-tight text-justify"></span></div>
+                    
+                    <div class="grid grid-cols-2 gap-x-4">
+                        <div><span class="text-slate-500 text-[8px] block">Inspección por Aparatos:</span> <span id="p_repSystems" class="font-semibold text-[10px] block leading-tight text-justify"></span></div>
+                        <div><span class="text-slate-500 text-[8px] block">Antecedentes Patológicos:</span> <span id="p_repPast" class="font-semibold text-[10px] block leading-tight text-justify"></span></div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-x-4">
+                        <div><span class="text-slate-500 text-[8px] block">Medicamentos:</span> <span id="p_repMeds" class="font-semibold text-[10px] block leading-tight text-justify"></span></div>
+                        <div><span class="text-slate-500 text-[8px] block">Alergias:</span> <span id="p_repAllergies" class="font-semibold text-[10px] block leading-tight text-justify"></span></div>
+                    </div>
+
+                    <div><span class="text-slate-500 text-[8px] block">Diagnóstico(s):</span> <span id="p_repDiag" class="font-bold text-[10px] block leading-tight text-justify"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Tratamiento Indicado:</span> <span id="p_repTreatment" class="font-bold text-[10px] block leading-tight text-justify"></span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== PDF PAGE 2 ==================== -->
+        <div class="pdf-page bg-white font-sans text-[10px] leading-snug">
+            
+            <!-- HEADER PAGE 2 -->
+            <div class="border-b-2 border-cyan-950 pb-2 mb-4 flex justify-between items-end">
+                <div>
+                    <h2 class="text-xl font-black text-cyan-950 tracking-wider m-0 p-0 leading-none">MEDICAL SERVICES</h2>
+                    <p class="text-[9px] text-slate-500 font-bold tracking-wide mt-1">PÁGINA 2 - CARGOS Y RESPONSIVAS</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[8px] font-bold text-slate-400 uppercase m-0">Folio Clínico</p>
+                    <p id="p_folio2" class="text-[10px] font-extrabold text-cyan-900 m-0"></p>
+                </div>
+            </div>
+
+            <!-- SECTION 5: PAGOS Y CONCEPTOS -->
+            <div class="mb-4">
+                <div class="bg-cyan-100 text-cyan-950 px-2 py-1 font-bold uppercase text-[9px] mb-2 flex justify-between">
+                    <span>5. MÉTODO DE PAGO Y CONCEPTOS / PAYMENT METHOD & CHARGES</span>
+                </div>
+                
+                <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2 font-bold text-[9px]">
+                    <div class="flex items-center gap-1">
+                        <span id="p_payConsultaBox" class="w-3 h-3 border border-slate-400 inline-block text-center text-[8px] leading-none"></span> CONSULTA
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span id="p_payRespBox" class="w-3 h-3 border border-slate-400 inline-block text-center text-[8px] leading-none"></span> RESP. HOTEL
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span id="p_payHospBox" class="w-3 h-3 border border-slate-400 inline-block text-center text-[8px] leading-none"></span> PAGO HOSPITAL
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span id="p_payInsurBox" class="w-3 h-3 border border-slate-400 inline-block text-center text-[8px] leading-none"></span> ASEGURADORA
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span id="p_payCreditBox" class="w-3 h-3 border border-slate-400 inline-block text-center text-[8px] leading-none"></span> T. CRÉDITO
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span id="p_payCashBox" class="w-3 h-3 border border-slate-400 inline-block text-center text-[8px] leading-none"></span> EFECTIVO
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span id="p_payRoomBox" class="w-3 h-3 border border-slate-400 inline-block text-center text-[8px] leading-none"></span> CARGO HAB.
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4 mb-2">
+                    <div><span class="text-slate-500 text-[8px] block">N° de Cuenta:</span> <span id="p_payAccount" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">N° Póliza:</span> <span id="p_payPolicy" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">Hospital:</span> <span id="p_payHospital" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                </div>
+
+                <table class="w-full text-left border-collapse border border-slate-300 mb-2">
+                    <thead>
+                        <tr class="bg-slate-100">
+                            <th class="border border-slate-300 p-1 text-[9px]">Conceptos | Services</th>
+                            <th class="border border-slate-300 p-1 text-[9px] text-center w-16">Unidades</th>
+                            <th class="border border-slate-300 p-1 text-[9px] text-right w-24">Cargos</th>
+                        </tr>
+                    </thead>
+                    <tbody id="p_chargesTableBody">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+
+                <div class="flex justify-end text-[10px]">
+                    <div class="w-48">
+                        <div class="flex justify-between border-b border-slate-200 py-0.5"><span class="font-bold">TOTAL MXN:</span> <span id="p_totMxn" class="font-bold"></span></div>
+                        <div class="flex justify-between border-b border-slate-200 py-0.5"><span class="font-bold text-slate-500">T. CAMBIO:</span> <span id="p_totExchange" class="text-slate-700"></span></div>
+                        <div class="flex justify-between py-0.5"><span class="font-black">TOTAL USD:</span> <span id="p_totUsd" class="font-black text-[12px]"></span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 6: MEDICO -->
+            <div class="mb-5">
+                <div class="bg-cyan-100 text-cyan-950 px-2 py-1 font-bold uppercase text-[9px] mb-2 flex justify-between">
+                    <span>6. MÉDICO TRATANTE / ATTENDING PHYSICIAN</span>
+                </div>
+                <div class="flex gap-4">
+                    <div class="w-1/2">
+                        <span class="text-slate-500 text-[8px] block">Nombre y Cédula Profesional:</span>
+                        <span id="p_docName" class="font-bold text-[11px] border-b border-slate-200 block min-h-[14px]"></span>
+                    </div>
+                    <div class="w-1/2">
+                        <span class="text-slate-500 text-[8px] block mb-0.5">Firma del Médico:</span>
+                        <div class="h-16 border-b-2 border-slate-800 relative w-48">
+                            <img id="p_imgSigPhysician" class="absolute bottom-0 left-0 max-h-full max-w-full" src="" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 7: RECHAZO DE SERVICIO -->
+            <div class="mb-5 border-2 border-slate-200 p-2 relative">
+                <div class="absolute -top-3 left-2 bg-white px-1 font-black text-slate-800 text-[11px]">
+                    7. RECHAZO DE SERVICIO MÉDICO / REFUSAL OF MEDICAL SERVICE
+                </div>
+                <div class="text-[9px] text-justify text-slate-800 mt-1 mb-3">
+                    <p class="mb-1"><strong class="uppercase text-[8px] text-slate-500">Español:</strong> A pesar de la recomendación del médico, <strong>ME NIEGO A RECIBIR ATENCIÓN MÉDICA</strong>. El médico me ha explicado los riesgos consiguientes a mi negativa. Al firmar este documento, yo reconozco que mi estado de salud ha sido evaluado y explicado por el médico, quien ha recomendado tratamiento como se mencionado anteriormente lo que comprendo perfectamente. A pesar de esta compresión, ME NIEGO A ACEPTAR ESTA ATENCIÓN O TRATAMIENTO MÉDICO. Yo asumo toda la responsabilidad derivada de mi decisión y exonero de cualquier responsabilidad al médico, personal del hotel y otras personas involucradas en mi atención médica.</p>
+                    <p><strong class="uppercase text-[8px] text-slate-500">English:</strong> Despite the physician's recommendation, <strong>I REFUSE TO CONSENT TO MEDICAL CARE</strong>. The physician has explained the risk entailed by my refusal. By signing this document, I acknowledge that my health status has been evaluated and explained by the physician, whom has recommended treatment as stated above, which i fully understand. Regardless of this understanding, I REFUSE TO CONSENT TO ANY MEDICAL CARE OR TREATMENT. I assume full responsability arising out of such refusal and release the physician, hotel staff and any other people involved in my medical care from any liability.</p>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <span class="text-slate-500 text-[8px] block mb-0.5">Firma del Paciente:</span>
+                        <div class="h-12 border-b-2 border-slate-800 relative mb-1">
+                            <img id="p_imgSigRefPat" class="absolute bottom-0 left-0 max-h-full max-w-full" src="" />
+                        </div>
+                        <span id="p_refPatName" class="font-bold text-[9px] block text-center min-h-[12px]"></span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 text-[8px] block mb-0.5">Firma Testigo 1:</span>
+                        <div class="h-12 border-b-2 border-slate-800 relative mb-1">
+                            <img id="p_imgSigWit1" class="absolute bottom-0 left-0 max-h-full max-w-full" src="" />
+                        </div>
+                        <span id="p_refWit1Name" class="font-bold text-[9px] block text-center min-h-[12px]"></span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 text-[8px] block mb-0.5">Firma Testigo 2:</span>
+                        <div class="h-12 border-b-2 border-slate-800 relative mb-1">
+                            <img id="p_imgSigWit2" class="absolute bottom-0 left-0 max-h-full max-w-full" src="" />
+                        </div>
+                        <span id="p_refWit2Name" class="font-bold text-[9px] block text-center min-h-[12px]"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 8: DATOS FISCALES -->
+            <div class="mb-4">
+                <div class="bg-cyan-100 text-cyan-950 px-2 py-1 font-bold uppercase text-[9px] mb-2 flex justify-between">
+                    <span>8. DATOS FISCALES / TAX INVOICE DATA</span>
+                </div>
+                <div class="grid grid-cols-3 gap-x-4 gap-y-1.5">
+                    <div class="col-span-2"><span class="text-slate-500 text-[8px] block">Razón Social:</span> <span id="p_taxName" class="font-bold text-[10px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div><span class="text-slate-500 text-[8px] block">RFC:</span> <span id="p_taxRfc" class="font-bold text-[10px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div class="col-span-3"><span class="text-slate-500 text-[8px] block">Dirección Fiscal:</span> <span id="p_taxAddress" class="font-bold text-[10px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div class="col-span-1"><span class="text-slate-500 text-[8px] block">Teléfono:</span> <span id="p_taxPhone" class="font-bold text-[10px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                    <div class="col-span-2"><span class="text-slate-500 text-[8px] block">Correo:</span> <span id="p_taxEmail" class="font-bold text-[10px] border-b border-slate-200 block min-h-[14px]"></span></div>
+                </div>
+            </div>
+
+            <!-- FOOTER -->
+            <div class="absolute bottom-[10mm] left-[15mm] right-[15mm] text-center border-t border-slate-300 pt-1.5">
+                <p class="font-extrabold text-slate-800 text-[9px] m-0">OPERADORA JOYA RIVIERA MAYA S.A.P.I. DE C.V.</p>
+                <p class="text-slate-500 text-[8px] m-0">Carretera Federal km. 307, Chetumal-Pto. Juárez, Residencial Campestre, Playa del Carmen, Quintana Roo, México</p>
             </div>
 
         </div>
-    </main>
+    </div>
+
+
+    <!-- Custom Modal for form reset confirmation -->
+    <div id="resetModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] hidden flex items-center justify-center px-4 transition-opacity">
+        <div class="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl scale-100 transform transition-all">
+            <h3 class="text-xl font-bold text-slate-900 mb-2">¿Limpiar formato?</h3>
+            <p class="text-sm text-slate-600 mb-6">Esta acción borrará todos los campos de texto, casillas y firmas. No se puede deshacer.</p>
+            <div class="flex flex-col-reverse md:flex-row justify-end gap-3">
+                <button onclick="cancelReset()" class="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+                    Cancelar
+                </button>
+                <button onclick="confirmReset()" class="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition">
+                    Sí, limpiar todo
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script>
-        // Set dates automatically
-        const todayStr = new Date().toISOString().split('T')[0];
-        document.getElementById('currentDate').textContent = todayStr;
-        document.getElementById('currentDatePage2').textContent = todayStr;
+        // Set dates automatically with time (No seconds)
+        const updateCurrentDates = () => {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('es-MX', {
+                day: '2-digit', month: '2-digit', year: 'numeric'
+            }) + ' ' + now.toLocaleTimeString('es-MX', {
+                hour: '2-digit', minute: '2-digit', hour12: true
+            });
+            const el1 = document.getElementById('currentDate');
+            const el2 = document.getElementById('currentDatePage2');
+            if(el1) el1.textContent = dateStr;
+            if(el2) el2.textContent = dateStr;
+        };
+        updateCurrentDates();
 
         // Auto-increment folio logic
         let currentFolio = localStorage.getItem('joya_last_folio');
@@ -514,17 +804,24 @@
         localStorage.setItem('joya_last_folio', currentFolio);
         document.getElementById('folioDisplay').textContent = `JY-2026-${String(currentFolio).padStart(4, '0')}`;
 
-        // Reset form function with confirmation
-        function resetForm() {
-            if (confirm('¿Desea limpiar todos los campos del formato?')) {
-                document.querySelectorAll('input:not([type="button"]):not([type="submit"]), textarea, select').forEach(el => {
-                    if (el.type === 'checkbox') el.checked = false;
-                    else el.value = '';
-                });
-                ['sigPatient', 'sigPhysician', 'sigRefusalPatient', 'sigWitness1', 'sigWitness2'].forEach(id => {
-                    clearSignature(id);
-                });
-            }
+        // Reset form function with custom modal
+        function showResetModal() {
+            document.getElementById('resetModal').classList.remove('hidden');
+        }
+
+        function cancelReset() {
+            document.getElementById('resetModal').classList.add('hidden');
+        }
+
+        function confirmReset() {
+            document.getElementById('resetModal').classList.add('hidden');
+            document.querySelectorAll('input:not([type="button"]):not([type="submit"]), textarea, select').forEach(el => {
+                if (el.type === 'checkbox') el.checked = false;
+                else el.value = '';
+            });
+            ['sigPatient', 'sigPhysician', 'sigRefusalPatient', 'sigWitness1', 'sigWitness2'].forEach(id => {
+                clearSignature(id);
+            });
         }
 
         // Robust Touch & Mouse Signature Pad System
@@ -541,7 +838,7 @@
                     canvas.width = rect.width * window.devicePixelRatio;
                     canvas.height = rect.height * window.devicePixelRatio;
                     ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-                    ctx.strokeStyle = '#082f49'; // Deep medical cyan-950 ink
+                    ctx.strokeStyle = '#082f49';
                     ctx.lineWidth = 2.5;
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
@@ -589,13 +886,11 @@
                 isDrawing = false;
             }
 
-            // Mouse Events
             canvas.addEventListener('mousedown', startDraw);
             canvas.addEventListener('mousemove', draw);
             canvas.addEventListener('mouseup', stopDraw);
             canvas.addEventListener('mouseleave', stopDraw);
 
-            // Touch Events for Tablets (iPad, Android, Surface)
             canvas.addEventListener('touchstart', startDraw, { passive: false });
             canvas.addEventListener('touchmove', draw, { passive: false });
             canvas.addEventListener('touchend', stopDraw);
@@ -611,7 +906,6 @@
             }
         }
 
-        // Initialize all signature areas once window loads
         window.onload = function() {
             setTimeout(() => {
                 ['sigPatient', 'sigPhysician', 'sigRefusalPatient', 'sigWitness1', 'sigWitness2'].forEach(id => {
@@ -619,6 +913,187 @@
                 });
             }, 200);
         };
+
+        // ==========================================
+        // SISTEMA DE GENERACIÓN DE PDF PROFESIONAL
+        // ==========================================
+        function getVal(id) {
+            const el = document.getElementById(id);
+            return el && el.value.trim() !== '' ? el.value : '—';
+        }
+
+        function populatePrintTemplate() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('es-MX', {day: '2-digit', month: '2-digit', year: 'numeric'}) + ' ' + 
+                            now.toLocaleTimeString('es-MX', {hour: '2-digit', minute: '2-digit', hour12: true});
+            
+            document.getElementById('p_currentDate').innerText = dateStr;
+            const folio = document.getElementById('folioDisplay').innerText;
+            document.getElementById('p_folio').innerText = folio;
+            document.getElementById('p_folio2').innerText = folio;
+
+            // Sec 1: Patient
+            document.getElementById('p_patName').innerText = getVal('f_patName');
+            document.getElementById('p_headerAccount').innerText = getVal('f_payAccount');
+            document.getElementById('p_patAge').innerText = getVal('f_patAge');
+            document.getElementById('p_patDob').innerText = getVal('f_patDob');
+            document.getElementById('p_patGender').innerText = getVal('f_patGender');
+            document.getElementById('p_patOcc').innerText = getVal('f_patOcc');
+            document.getElementById('p_patPhone').innerText = getVal('f_patPhone');
+            document.getElementById('p_patAddress').innerText = getVal('f_patAddress');
+            document.getElementById('p_patCity').innerText = getVal('f_patCity');
+            document.getElementById('p_patState').innerText = getVal('f_patState');
+            const zip = getVal('f_patZip');
+            const country = getVal('f_patCountry');
+            document.getElementById('p_patZipCountry').innerText = (zip !== '—' || country !== '—') ? `${zip} / ${country}` : '—';
+            document.getElementById('p_patHotel').innerText = getVal('f_patHotel');
+            document.getElementById('p_patCheckIn').innerText = getVal('f_patCheckIn');
+            document.getElementById('p_patCheckOut').innerText = getVal('f_patCheckOut');
+
+            // Sec 3: Vitals
+            document.getElementById('p_vitDate').innerText = getVal('f_vitDate');
+            document.getElementById('p_vitWeight').innerText = getVal('f_vitWeight');
+            document.getElementById('p_vitHeight').innerText = getVal('f_vitHeight');
+            document.getElementById('p_vitTemp').innerText = getVal('f_vitTemp');
+            document.getElementById('p_vitHr').innerText = getVal('f_vitHr');
+            document.getElementById('p_vitRr').innerText = getVal('f_vitRr');
+            document.getElementById('p_vitBp').innerText = getVal('f_vitBp');
+            document.getElementById('p_vitSpo2').innerText = getVal('f_vitSpo2');
+
+            // Sec 4: Report
+            const isEmerg = document.getElementById('f_repEmergency').checked;
+            document.getElementById('p_repEmergency').innerText = isEmerg ? 'EMERGENCIA MÉDICA / MEDICAL EMERGENCY' : '';
+            document.getElementById('p_repComplaint').innerText = getVal('f_repComplaint');
+            document.getElementById('p_repHistory').innerText = getVal('f_repHistory');
+            document.getElementById('p_repSystems').innerText = getVal('f_repSystems');
+            document.getElementById('p_repPast').innerText = getVal('f_repPast');
+            document.getElementById('p_repMeds').innerText = getVal('f_repMeds');
+            document.getElementById('p_repAllergies').innerText = getVal('f_repAllergies');
+            document.getElementById('p_repDiag').innerText = getVal('f_repDiag');
+            document.getElementById('p_repTreatment').innerText = getVal('f_repTreatment');
+
+            // Sec 5: Payment
+            const mark = '✓';
+            document.getElementById('p_payConsultaBox').innerText = document.getElementById('f_payConsulta').checked ? mark : '';
+            document.getElementById('p_payRespBox').innerText = document.getElementById('f_payResp').checked ? mark : '';
+            document.getElementById('p_payHospBox').innerText = document.getElementById('f_payHosp').checked ? mark : '';
+            document.getElementById('p_payInsurBox').innerText = document.getElementById('f_payInsur').checked ? mark : '';
+            document.getElementById('p_payCreditBox').innerText = document.getElementById('f_payCredit').checked ? mark : '';
+            document.getElementById('p_payCashBox').innerText = document.getElementById('f_payCash').checked ? mark : '';
+            document.getElementById('p_payRoomBox').innerText = document.getElementById('f_payRoom').checked ? mark : '';
+            
+            document.getElementById('p_payAccount').innerText = getVal('f_payAccount');
+            document.getElementById('p_payPolicy').innerText = getVal('f_payPolicy');
+            document.getElementById('p_payHospital').innerText = getVal('f_payHospital');
+
+            // Table mapping
+            const tbodySource = document.getElementById('chargesTableBody');
+            const tbodyDest = document.getElementById('p_chargesTableBody');
+            tbodyDest.innerHTML = '';
+            if(tbodySource) {
+                const rows = tbodySource.querySelectorAll('tr');
+                rows.forEach(row => {
+                    const inputs = row.querySelectorAll('input');
+                    if(inputs.length === 3) {
+                        const val1 = inputs[0].value.trim() || '—';
+                        const val2 = inputs[1].value.trim() || '—';
+                        const val3 = inputs[2].value.trim() || '—';
+                        tbodyDest.innerHTML += `
+                            <tr>
+                                <td class="border border-slate-300 p-1 truncate">${val1}</td>
+                                <td class="border border-slate-300 p-1 text-center truncate">${val2}</td>
+                                <td class="border border-slate-300 p-1 text-right truncate">${val3}</td>
+                            </tr>
+                        `;
+                    }
+                });
+            }
+
+            document.getElementById('p_totMxn').innerText = getVal('f_totMxn');
+            document.getElementById('p_totExchange').innerText = getVal('f_totExchange');
+            document.getElementById('p_totUsd').innerText = getVal('f_totUsd');
+
+            // Sec 6: Physician
+            document.getElementById('p_docName').innerText = getVal('f_docName');
+
+            // Sec 7 & 8: Refusal and Tax
+            document.getElementById('p_refPatName').innerText = getVal('f_refPatName');
+            document.getElementById('p_refWit1Name').innerText = getVal('f_refWit1Name');
+            document.getElementById('p_refWit2Name').innerText = getVal('f_refWit2Name');
+
+            document.getElementById('p_taxName').innerText = getVal('f_taxName');
+            document.getElementById('p_taxRfc').innerText = getVal('f_taxRfc');
+            document.getElementById('p_taxAddress').innerText = getVal('f_taxAddress');
+            document.getElementById('p_taxPhone').innerText = getVal('f_taxPhone');
+            document.getElementById('p_taxEmail').innerText = getVal('f_taxEmail');
+
+            // Signatures
+            document.getElementById('p_imgSigPatient').src = document.getElementById('sigPatient').toDataURL('image/png');
+            document.getElementById('p_imgSigPhysician').src = document.getElementById('sigPhysician').toDataURL('image/png');
+            document.getElementById('p_imgSigRefPat').src = document.getElementById('sigRefusalPatient').toDataURL('image/png');
+            document.getElementById('p_imgSigWit1').src = document.getElementById('sigWitness1').toDataURL('image/png');
+            document.getElementById('p_imgSigWit2').src = document.getElementById('sigWitness2').toDataURL('image/png');
+        }
+
+        function prepareNewRecord() {
+            // Limpiar todos los campos del formulario
+            document.querySelectorAll('input:not([type="button"]):not([type="submit"]), textarea, select').forEach(el => {
+                if (el.type === 'checkbox') el.checked = false;
+                else el.value = '';
+            });
+            // Restablecer Hospital por defecto
+            const hospInput = document.getElementById('f_payHospital');
+            if(hospInput) hospInput.value = "Hospital Joya Playa del Carmen";
+
+            // Limpiar firmas
+            ['sigPatient', 'sigPhysician', 'sigRefusalPatient', 'sigWitness1', 'sigWitness2'].forEach(id => {
+                clearSignature(id);
+            });
+
+            // Incrementar y mostrar nuevo folio
+            let currentFolio = localStorage.getItem('joya_last_folio');
+            if (!currentFolio) {
+                currentFolio = 1044;
+            } else {
+                currentFolio = parseInt(currentFolio) + 1;
+            }
+            localStorage.setItem('joya_last_folio', currentFolio);
+            document.getElementById('folioDisplay').textContent = `JY-2026-${String(currentFolio).padStart(4, '0')}`;
+
+            // Actualizar fechas
+            updateCurrentDates();
+        }
+
+        function generatePDF() {
+            const btnText = document.getElementById('btnPdfText');
+            const origText = btnText.innerText;
+            btnText.innerText = 'Generando...';
+
+            populatePrintTemplate();
+
+            const element = document.getElementById('printTemplate');
+            element.style.display = 'block';
+
+            const opt = {
+                margin:       0,
+                filename:     `Expediente_${getVal('f_patName').replace(/[^a-z0-9]/gi, '_')}.pdf`,
+                image:        { type: 'jpeg', quality: 1 },
+                html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
+                jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                element.style.display = 'none';
+                btnText.innerText = origText;
+                // Preparar automáticamente un nuevo registro y nuevo folio al terminar
+                prepareNewRecord();
+            }).catch(err => {
+                console.error("Error al generar PDF:", err);
+                element.style.display = 'none';
+                btnText.innerText = origText;
+                alert("Ocurrió un error al generar el PDF. Por favor intente nuevamente.");
+            });
+        }
     </script>
 </body>
 </html>
